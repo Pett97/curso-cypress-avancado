@@ -76,6 +76,11 @@ describe("Hacker Stories", () => {
             .and("contain", stories.hits[0].author)
             .and("contain", stories.hits[0].num_comments)
             .and("contain", stories.hits[0].points);
+          cy.get(`.item a:contains(${stories.hits[0].title})`).should(
+            "have.attr",
+            "href",
+            stories.hits[0].url
+          );
 
           cy.get(".item")
             .last()
@@ -84,92 +89,128 @@ describe("Hacker Stories", () => {
             .and("contain", stories.hits[1].author)
             .and("contain", stories.hits[1].num_comments)
             .and("contain", stories.hits[1].points);
+          cy.get(`.item a:contains(${stories.hits[1].title})`).should(
+            "have.attr",
+            "href",
+            stories.hits[1].url
+          );
         });
+      });
+
+      context("Order by", () => {
+        it("orders by title", () => {
+          cy.get('.list-header-button:contains(Title)').click()
+
+          cy.get('.item a').first().should("contain",stories.hits[0].title)
+          cy.get('.item a').last().should("contain",stories.hits[1].title)
+        });
+    
+        it("orders by author", () => {
+          cy.get('.list-header-button:contains(Author)').click()
+          cy.get('.item')
+              .first()
+              .should('be.visible')
+              .and('contain', stories.hits[0].author)
+          
+        });
+    
+        it("orders by comments", () => {
+          cy.get('.list-header-button:contains(Comments)').click()
+          cy.get('.item')
+              .first()
+              .should('be.visible')
+              .and('contain', stories.hits[1].num_comments)
+        });
+    
+        it("orders by points", () => {
+          cy.get('.list-header-button:contains(Points)').click()
+          cy.get('.item')
+              .first()
+              .should('be.visible')
+              .and('contain', stories.hits[1].points)
+        });
+      });
+
+    });
+
+    context("Search", () => {
+      beforeEach(() => {
+        cy.intercept("GET", `**/search?query=${initialTerm}&page=0`, {
+          fixture: "empty",
+        }).as("emptyJSON");
+        cy.intercept("GET", `**/search?query=${newTerm}&page=0`, {
+          fixture: "stories",
+        }).as("storiesJSON");
+
+        cy.visit("/");
+        cy.wait("@emptyJSON");
+
+        cy.get("#search").clear();
+      });
+
+      it("types and hits ENTER", () => {
+        cy.get("#search").type(`${newTerm}{enter}`);
+
+        cy.wait("@storiesJSON");
+
+        cy.get(".item").should("have.length", 2);
+        cy.get(".item").first().should("contain", newTerm);
+      });
+
+      it("types and clicks the submit button", () => {
+        cy.get("#search").type(newTerm);
+        cy.contains("Submit").click();
+
+        cy.wait("@storiesJSON");
+
+        cy.get(".item").should("have.length", 2);
+        cy.get(".item").first().should("contain", newTerm);
+        cy.get(`button:contains(${initialTerm})`).should("be.visible");
       });
     });
   });
 
-  context("Search", () => {
-    beforeEach(() => {
-      cy.intercept("GET", `**/search?query=${initialTerm}&page=0`, {
-        fixture: "empty"}).as("emptyJSON");
-      cy.intercept("GET", `**/search?query=${newTerm}&page=0`, {
-        fixture: "stories"}).as("storiesJSON");
+  
 
-      cy.visit("/");
-      cy.wait("@emptyJSON");
+  context.skip("Last searches", () => {
+    it.skip("shows a max of 5 buttons for the last searched terms", () => {
+      const faker = require("faker");
 
-      cy.get("#search").clear();
-    });
+      cy.intercept({
+        method: "GET",
+        pathname: "**/search**",
+      }).as("getRandomStories");
 
-    it("types and hits ENTER", () => {
-      cy.get("#search").type(`${newTerm}{enter}`);
+      Cypress._.times(6, () => {
+        cy.get("#search").clear().type(`${faker.random.word()}{enter}`);
+        cy.wait("@getRandomStories");
+      });
 
-      cy.wait("@storiesJSON");
-
-      cy.get(".item").should("have.length", 2);
-      cy.get(".item").first().should("contain",newTerm)
-    });
-
-    it("types and clicks the submit button", () => {
-      cy.get("#search").type(newTerm);
-      cy.contains("Submit").click();
-
-      cy.wait("@storiesJSON");
-
-      cy.get(".item").should("have.length", 2);
-      cy.get(".item").first().should("contain", newTerm);
-      cy.get(`button:contains(${initialTerm})`).should("be.visible");
+      cy.get(".last-searches button").should("have.length", 5);
     });
   });
 
-  context("Errors", () => {
-    it('shows "Something went wrong ..." in case of a server error', () => {
-      cy.intercept("GET", "**/search**", { statusCode: 500 }).as(
-        "getServerFailure"
-      );
+  //teste de erro sempre fora do escopo de teste normal
+ 
+});
+context("Errors", () => {
+  it('shows "Something went wrong ..." in case of a server error', () => {
+    cy.intercept("GET", "**/search**", { statusCode: 500 }).as(
+      "getServerFailure"
+    );
 
-      cy.visit("/");
-      cy.wait("@getServerFailure");
-      cy.get("p:contains(Something went wrong)").should("be.visible");
-    });
-
-    it('shows "Something went wrong ..." in case of a network error', () => {
-      cy.intercept("GET", "**/search**", { statusCode: 500 }).as(
-        "getServerFailure"
-      );
-
-      cy.visit("/");
-      cy.wait("@getServerFailure");
-      cy.get("p:contains(Something went wrong)").should("be.visible");
-    });
+    cy.visit("/");
+    cy.wait("@getServerFailure");
+    cy.get("p:contains(Something went wrong)").should("be.visible");
   });
-});
 
-context.skip("Order by", () => {
-  it("orders by title", () => {});
+  it('shows "Something went wrong ..." in case of a network error', () => {
+    cy.intercept("GET", "**/search**", { statusCode: 500 }).as(
+      "getServerFailure"
+    );
 
-  it("orders by author", () => {});
-
-  it("orders by comments", () => {});
-
-  it("orders by points", () => {});
-});
-
-context.skip("Last searches", () => {
-  it.skip("shows a max of 5 buttons for the last searched terms", () => {
-    const faker = require("faker");
-
-    cy.intercept({
-      method: "GET",
-      pathname: "**/search**",
-    }).as("getRandomStories");
-
-    Cypress._.times(6, () => {
-      cy.get("#search").clear().type(`${faker.random.word()}{enter}`);
-      cy.wait("@getRandomStories");
-    });
-
-    cy.get(".last-searches button").should("have.length", 5);
+    cy.visit("/");
+    cy.wait("@getServerFailure");
+    cy.get("p:contains(Something went wrong)").should("be.visible");
   });
 });
