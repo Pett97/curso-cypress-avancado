@@ -1,7 +1,7 @@
 {
     "hits": [
       {
-        "title": "Sample 1",
+        "title": "Cypress",
         "url": "https://example.com/1",
         "author": "Author 1",
         "num_comments": 34,
