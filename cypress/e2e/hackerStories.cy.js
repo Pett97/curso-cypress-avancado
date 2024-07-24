@@ -1,11 +1,53 @@
-describe("Hacker Stories", () => {
-  beforeEach(() => {
-    cy.intercept("GET", "**/search?query=React&page=0").as("getStories");
-    cy.visit("/");
+/// <reference types="cypress"/>
 
-    //cy.assertLoadingIsShownAndHidden()
-    //cy.contains('More').should('be.visible')
-    cy.wait("@getStories");
+describe("Hacker Stories", () => {
+  const initialTerm = "React";
+  const newTerm = "Cypress";
+
+  context.only("Batendo API real", () => {
+    beforeEach(() => {
+      cy.intercept("GET", `**/search?query=${initialTerm}&page=0`).as(
+        "getStories"
+      );
+      cy.visit("/");
+      cy.wait("@getStories");
+      cy.get(".item").first().should("contain", initialTerm);
+    });
+
+    it('shows 20 stories, then the next 20 after clicking "More"', () => {
+      cy.intercept("GET", `**/search?query=${initialTerm}&page=0`).as(
+        "getStories"
+      );
+      cy.visit("/");
+
+      //cy.assertLoadingIsShownAndHidden()
+      //cy.contains('More').should('be.visible')
+
+      cy.get(".item").should("have.length", 20);
+
+      cy.contains("More").click();
+
+      cy.assertLoadingIsShownAndHidden();
+      cy.wait("@getStories");
+      cy.get(".item").should("have.length", 40);
+    });
+
+    it("searches via the last searched term", () => {
+      cy.intercept("GET", `**/search?query=${newTerm}&page=0`).as(
+        "getNewTermsStories"
+      );
+      cy.get("#search").clear();
+      cy.get("#search").type(`${newTerm}{enter}`);
+      cy.wait("@getNewTermsStories");
+
+      cy.get(`button:contains(${initialTerm})`).should("be.visible").click();
+      cy.wait("@getStories");
+      cy.get(".item").should("have.length", 20);
+      cy.get(".item").first().should("contain", initialTerm);
+      cy.get(`button:contains(${newTerm})`).should("be.visible");
+    });
+
+    //FIM CONTEXTO batendo api REAL
   });
 
   it("shows the footer", () => {
@@ -108,20 +150,6 @@ describe("Hacker Stories", () => {
     //});
     //
     context("Last searches", () => {
-      it("searches via the last searched term", () => {
-        cy.get("#search").type(`${newTerm}{enter}`);
-
-        cy.wait("@getNewTermsStories");
-
-        cy.get(`button:contains(${initialTerm})`).should("be.visible").click();
-
-        cy.wait("@getStories");
-
-        cy.get(".item").should("have.length", 20);
-        cy.get(".item").first().should("contain", initialTerm);
-        cy.get(`button:contains(${newTerm})`).should("be.visible");
-      });
-
       it("shows a max of 5 buttons for the last searched terms", () => {
         const faker = require("faker");
 
@@ -141,26 +169,24 @@ describe("Hacker Stories", () => {
   });
 });
 
+context("Errors", () => {
+  it('shows "Something went wrong ..." in case of a server error', () => {
+    cy.intercept("GET", "**/search**", { statusCode: 500 }).as(
+      "getServerFailure"
+    );
 
-  context("Errors", () => {
-    it('shows "Something went wrong ..." in case of a server error', () => {
-      cy.intercept('GET', '**/search**', { statusCode: 500 }).as(
-        "getServerFailure"
-      );
-
-      cy.visit("/");
-      cy.wait("@getServerFailure");
-      cy.get('p:contains(Something went wrong)').should("be.visible");
-    });
-
-    it('shows "Something went wrong ..." in case of a network error', () => {
-      cy.intercept("GET", "**/search**", { statusCode: 500 }).as(
-        "getServerFailure"
-      );
-
-      cy.visit("/");
-      cy.wait("@getServerFailure");
-      cy.get('p:contains(Something went wrong)').should("be.visible");
-    });
+    cy.visit("/");
+    cy.wait("@getServerFailure");
+    cy.get("p:contains(Something went wrong)").should("be.visible");
   });
 
+  it('shows "Something went wrong ..." in case of a network error', () => {
+    cy.intercept("GET", "**/search**", { statusCode: 500 }).as(
+      "getServerFailure"
+    );
+
+    cy.visit("/");
+    cy.wait("@getServerFailure");
+    cy.get("p:contains(Something went wrong)").should("be.visible");
+  });
+});
